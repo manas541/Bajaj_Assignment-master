@@ -19,23 +19,23 @@ public class WebhookService {
 
     public void processWorkflow() {
 
+        // Step 1: Generate webhook
         String generateUrl = "https://bfhldevapigw.healthrx.co.in/hiring/generateWebhook/JAVA";
-
-//        https :// bfhldevapigw . healthrx . co . in / hiring / generateWebhook / JAVA
-
         WebhookRequest requestPayload = new WebhookRequest(name, regNo, email);
         HttpEntity<WebhookRequest> requestEntity = new HttpEntity<>(requestPayload, HttpUtils.getJsonHeaders());
 
-        ResponseEntity<WebhookResponse> response = restTemplate.postForEntity(
-                generateUrl, requestEntity, WebhookResponse.class
-        );
-
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            System.err.println("Failed to retrieve webhook info.");
+        ResponseEntity<WebhookResponse> response;
+        try {
+            response = restTemplate.postForEntity(generateUrl, requestEntity, WebhookResponse.class);
+        } catch (Exception e) {
+            System.err.println("Error while generating webhook: " + e.getMessage());
             return;
         }
 
-        System.out.println(response);
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            System.err.println("Failed to retrieve webhook info. Status: " + response.getStatusCode());
+            return;
+        }
 
         String webhookUrl = response.getBody().getWebhookUrl();
         String token = response.getBody().getAccessToken();
@@ -43,6 +43,13 @@ public class WebhookService {
         System.out.println("Webhook: " + webhookUrl);
         System.out.println("Access Token: " + token);
 
+        // ✅ Check webhook URL validity
+        if (webhookUrl == null || !webhookUrl.startsWith("http")) {
+            System.err.println("Invalid or missing webhook URL: " + webhookUrl);
+            return;
+        }
+
+        // Step 2: Prepare SQL Query
         String finalQuery = "SELECT \n" +
                 "    e1.EMP_ID,\n" +
                 "    e1.FIRST_NAME,\n" +
@@ -61,18 +68,23 @@ public class WebhookService {
                 "ORDER BY \n" +
                 "    e1.EMP_ID DESC;";
 
+        // Step 3: Submit answer
         HttpHeaders headers = HttpUtils.getJsonHeaders();
         headers.setBearerAuth(token);
 
         Map<String, String> answerPayload = Map.of("finalQuery", finalQuery);
         HttpEntity<Map<String, String>> submission = new HttpEntity<>(answerPayload, headers);
 
-        ResponseEntity<String> result = restTemplate.postForEntity(webhookUrl, submission, String.class);
+        try {
+            ResponseEntity<String> result = restTemplate.postForEntity(webhookUrl, submission, String.class);
 
-        if (result.getStatusCode().is2xxSuccessful()) {
-            System.out.println("Solution submitted successfully.");
-        } else {
-            System.err.println("Failed to submit solution. Response: " + result.getStatusCode());
+            if (result.getStatusCode().is2xxSuccessful()) {
+                System.out.println("Solution submitted successfully.");
+            } else {
+                System.err.println("Failed to submit solution. Response: " + result.getStatusCode());
+            }
+        } catch (Exception e) {
+            System.err.println("Error while submitting solution: " + e.getMessage());
         }
     }
 }
