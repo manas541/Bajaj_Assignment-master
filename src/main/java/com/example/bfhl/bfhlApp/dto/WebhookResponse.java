@@ -3,7 +3,7 @@ package com.example.bfhl.bfhlApp.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 public class WebhookResponse {
 
-    @JsonProperty("webhookUrl")
+    @JsonProperty("webhook")
     private String webhookUrl;
 
     @JsonProperty("accessToken")
